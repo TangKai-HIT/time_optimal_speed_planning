@@ -34,5 +34,5 @@ for k=1:N-1
     q(id, :) =  a0_k + (time_k - t_wp(k)) .* a1_k + (time_k - t_wp(k)).^2 .* a2_k + (time_k - t_wp(k)).^3 .* a3_k;
     dq(id, :) =  a1_k + 2*(time_k - t_wp(k)) .* a2_k + 3*(time_k - t_wp(k)).^2 .* a3_k;
     ddq(id, :) =  2*a2_k + 6*(time_k - t_wp(k)) .* a3_k;
-    dddq(id, :) =  6 * a3_k;
+    dddq(id, :) =  6 * ones(size(time_k)) .* a3_k;
 end
