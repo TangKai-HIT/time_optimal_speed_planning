@@ -1,4 +1,4 @@
-function [dq_t, ddq_t, Tau, t_min]=timeOptimSpeedPlan(q_s, dq_s, ddq_s, h, M_fn, C_fn, G_fn, constraints)
+function [dq_t, ddq_t, Tau, t_sample]=timeOptimSpeedPlan(q_s, dq_s, ddq_s, h, M_fn, C_fn, G_fn, constraints, options)
 % TIMEOPTIMSPEEDPLAN time optimal speed planning with kinematic and dynamic constraints 
 % by solving a discretized convex optimization problem
 %   Inputs:
@@ -7,11 +7,12 @@ function [dq_t, ddq_t, Tau, t_min]=timeOptimSpeedPlan(q_s, dq_s, ddq_s, h, M_fn,
 %       M_fn, C_fn, G_fn: function handles for evaluating mass term M,
 %                                       velocity product C(q, dq)*dq and gravity term G respectively (with row vector input)
 %       constraints: constraints struct
+%       options: fmincon option
 %   Outputs:
 %       dq_t: sampled velocity w.r.t time (N X dim)
 %       ddq_t: sampled  acceleration w.r.t time (N-1 X dim)
 %       Tau: sampled generalized force term (N-1 X dim)
-%       t_min: optimal time
+%       t_sample: corresponding time samples
 
 %% Init variables
 [N, dim] = size(q_s);
@@ -35,7 +36,7 @@ D_ddgamma = zeros(dim*(N-1), N-1);
 
 Mu = kron(ones(N-1, 1), constraints.Mu');
 Alpha = kron(ones(N-1, 1), constraints.Alpha');
-Lb = zeros(N-2, 1);
+Lb = ones(N-2, 1) * 1e-5; 
 Ub = zeros(N-2, 1);
 
 % generate inequality matrices & upper bound
@@ -66,13 +67,12 @@ Ub = zeros(N-2, 1);
         Alpha - C2_t;
         Alpha + C2_t];
 
-%% Solve LP
-f = -ones(N-2,1);
-options = optimoptions(@linprog);
+%% Solve convex problem
+func = @(x) timeObjFunc(x, h);
 
-disp("Doing Speed Planning (solving LP using dual-simplex)......");
+disp("Doing Speed Planning (solving convex problem)......");
 tic;
-b_optim(2 : N-1) = linprog(f, A, b, [], [], Lb, Ub, options);
+b_optim(2 : N-1) = fmincon(func, 0.8*Ub, A, b, [], [], Lb, Ub, [], options);
 solveTime = toc;
 fprintf("Finished! Run Time:%.4f\n", solveTime);
 
@@ -82,11 +82,8 @@ v_optim = sqrt(b_optim);
 dq_t = v_optim .* dq_s;
 ddq_t = a_optim .* dq_s(1:end-1, :) + b_optim(1:end-1) .* ddq_s(1:end-1, :);
 
-t_min = 0;
 for i=1:N-1
-    if (v_optim(i) + v_optim(i+1)) > 0
-        t_min = t_min + 1/(v_optim(i) + v_optim(i+1));
-    end
+    t_sample(i+1) = t_sample(i) + 1/(v_optim(i) + v_optim(i+1));
     Tau(i, :) = D_d((i-1)*dim+1 : i*dim, i) * a_optim(i) + D_c((i-1)*dim+1 : i*dim, i) * b_optim(i) + g((i-1)*dim+1 : i*dim, 1);
 end
-t_min = t_min * (2*h);
+t_sample = t_sample .* (2*h);
