@@ -64,7 +64,7 @@ jointStateTraj = [q_s'; dq_t'];
 figure();
 show(robot, q_s(1, :), 'Collisions','on', 'PreservePlot', false);
 hold on;
-axis([-0.5 0.5 -0.5 0.5 -0.1 0.5]);
+axis([-0.6 0.6 -0.6 0.6 -0.1 0.5]);
 
 for i=1:numSample
     % Current time 
@@ -72,6 +72,7 @@ for i=1:numSample
     % Interpolate simulated joint positions to get configuration at current time
     configNow = interp1(t_sim, jointState(:,1: 3), tNow);
     poseNow = getTransform(robot, configNow, "Body3");
+    poseNow = poseNow * T_tip;
     show(robot,configNow, 'Collisions','on', 'PreservePlot',false);
     jointSpaceMarker = plot3(poseNow(1,4),poseNow(2,4),poseNow(3,4),'r.','MarkerSize',20);
     drawnow;
