@@ -8,7 +8,7 @@ f_eval = @(t, k, b) t.*k + b;
 u_bar = fastLP_forward(ub, slopes, intersections, u_init, u_end);
 
 %% Perform backward phase
-for i=N-1 : 1
+for i=N-1 : -1 : 1
     %load slopes & intersections of linear inequalities, remove -1s
     F_ki = slopes{2}(i, :);   F_ki=F_ki(F_ki>=0);
     F_bi = intersections{2}(i, :);    F_bi=F_bi(F_bi>=0);
