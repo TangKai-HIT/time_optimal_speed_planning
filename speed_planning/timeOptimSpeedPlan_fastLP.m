@@ -49,6 +49,9 @@ Ub = zeros(N, 1);
     Ub(i) = min((constraints.Phi.^2) ./ (dq_s(i, :).^2));
  end
 
+ Ub(1) = constraints.b_init;
+ Ub(end) = constraints.b_end;
+
  %get slopes and intersections for fast LP
  [slopes, intersections]=get_fastLPIneq(D_d, D_c, D_g, D_mu, D_dgamma, D_ddgamma, D_alpha, h, Ub);
 
