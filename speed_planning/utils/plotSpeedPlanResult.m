@@ -16,6 +16,7 @@ for i=1:dim
 end
 title('Velocity');
 legend(p, tag, "Interpreter","latex","FontSize", 12);
+xlim([t_sample(1), t_sample(end)]);
 
 subplot(3,1,2)
 hold on;
@@ -27,6 +28,7 @@ for i=1:dim
 end
 title('Acceleration');
 legend(p, tag, "Interpreter","latex","FontSize", 12);
+xlim([t_sample(1), t_sample(end)]);
 
 subplot(3,1,3)
  hold on;
@@ -38,3 +40,4 @@ for i=1:dim
 end
 title('Force');
 legend(p, tag, "Interpreter","latex","FontSize", 12);
+xlim([t_sample(1), t_sample(end)]);
