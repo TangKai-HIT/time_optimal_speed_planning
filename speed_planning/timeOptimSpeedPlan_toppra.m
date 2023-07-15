@@ -23,43 +23,79 @@ function [dq_t, ddq_t, Tau, t_sample, exitFlag]=timeOptimSpeedPlan_toppra(q_s, d
 Tau = zeros(N-1, dim);
 t_sample = zeros(1, N);
 
-%% Get fast LP linear inequalities
-% dynamic
+%% Get linear inequalities
+%init
+A = zeros(2*2*dim, 2, N-1); %2*dynamic*acceleration
+b = zeros(2*2*dim, 1, N-1);
+
+Ub = ones(2, N-1) * inf; %[x; u]
+Lb = - ones(2, N-1) * inf;
+Lb(1, :) = zeros(1, N-1); % x=ds_dt^2>=0
+
+% dynamic (-torque <= d*u + c*x + g <= torque)
 D_d = zeros(N-1, dim); %matrix of d_{i,j}
 D_c =zeros(N-1, dim); %matrix of c_{i,j}
 D_g = zeros(N-1, dim); %matrix of g_{i,j}
 
 % kinematic
-D_mu = kron(ones(N-1, 1), constraints.Mu); %torque constraints
-D_alpha = kron(ones(N-1, 1), constraints.Alpha); %acceleration constraints
-Ub = zeros(N, 1);
+D_torque = constraints.Mu'; %dim X 1, torque constraints 
+D_accel = constraints.Alpha'; %dim X 1, acceleration constraints
 
 % generate inequality matrices & upper bound
- for i=1:N
-    if i<N
-        D_d(i, :) = M_fn(q_s(i, :)) * dq_s(i, :)';
-        D_c(i, :) = M_fn(q_s(i, :)) * ddq_s(i, :)' + C_fn(q_s(i, :), dq_s(i, :))';
-        D_g(i, :) = G_fn(q_s(i, :));
+ for i=1:N-1
+    %dynamic inequality constraints (-torque <= d*u + c*x + g <= torque)
+    D_d(i,:) = M_fn(q_s(i, :)) * dq_s(i, :)';
+    D_c(i,:) = M_fn(q_s(i, :)) * ddq_s(i, :)' + C_fn(q_s(i, :), dq_s(i, :))';
+    D_g(i,:) = G_fn(q_s(i, :));
+    
+    A(1:dim, :, i) = [D_c(i,:)', D_d(i,:)'];
+    b(1:dim, :, i) = D_torque - D_g(i,:)';
 
-    end
+    A(dim+1 : 2*dim, :, i) = [-D_c(i,:)', -D_d(i,:)'];
+    b(dim+1 : 2*dim, :, i) = D_torque + D_g(i,:)';
+
+    %acceleration inequality constraints (-alpha <= dq_ds*u + ddq_dds*x <= alpha)
+    A(2*dim+1 : 3*dim, :, i) = [ddq_s(i, :)', dq_s(i, :)']; %[x, u]
+    b(2*dim+1 : 3*dim, :, i) = D_accel;
+    
+    A(3*dim+1 : 4*dim, :, i) = [-ddq_s(i, :)', -dq_s(i, :)']; %[x, u]
+    b(3*dim+1 : 4*dim, :, i) = D_accel;
+
     %set ub
-    Ub(i) = min((constraints.Phi.^2) ./ (dq_s(i, :).^2)); %speed constraints
+    Ub(1, i) = min((constraints.Phi.^2) ./ (dq_s(i, :).^2)); %speed constraints
  end
 
 %% Solve toppra
+exitFlag = 1;
 disp("Doing Speed Planning (solving toppra)......");
+
 tic;
 
 %backward
-controllable_sets = toppra_backward_pass();
+[controllable_sets, backward_exitFlag] = toppra_backward_pass(A, b, Lb, Ub, constraints.b_end, h, N);
+if ~backward_exitFlag
+    exitFlag = 0;
+    return;
+end
+
 %forward
-[b_optim, a_optim] = toppra_forward_pass();
+if constraints.b_init<controllable_sets(1,1) || constraints.b_init>controllable_sets(1,2)
+    disp("Initial condition not in controllable set! Forward passed failed!");
+    exitFlag = 0;
+    return;
+end
+
+[b_optim, a_optim, forward_exitFlag] = toppra_forward_pass(A, b, Lb(2, :), Ub(2, :), controllable_sets, constraints.b_init, h, N);
+if ~forward_exitFlag
+    exitFlag = 0;
+    return;
+end
 
 solveTime = toc;
+
 fprintf("Finished! Run Time:%.4f\n", solveTime);
 
 %% Compute outputs
-a_optim = diff(b_optim) ./ (2*h);
 v_optim = sqrt(b_optim);
 dq_t = v_optim .* dq_s;
 ddq_t = a_optim .* dq_s(1:end-1, :) + b_optim(1:end-1) .* ddq_s(1:end-1, :);

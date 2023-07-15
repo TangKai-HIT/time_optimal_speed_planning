@@ -1,6 +1,5 @@
 %Testing time optimal speed planning algorithm using a 3-DOF robot
 clear; clc; close all;
-addpath(genpath(pwd));
 
 %% Init  robot & parameters
 [robot,importInfo] = importrobot('robot_3R.slx','DataFormat','row');
@@ -35,16 +34,8 @@ M_fn = @(q) massMatrix(robot, q);
 C_fn = @(q, dq) velocityProduct(robot, q, dq);
 G_fn = @(q) gravityTorque(robot, q);
 
-%Use nonlinear convex optimization: 
-% options = optimoptions(@fmincon, "MaxFunctionEvaluations", 5000, "PlotFcn", {'optimplotfvalconstr'});
-% options = optimoptions(@fmincon, "MaxFunctionEvaluations", 5000);
-% [dq_t, ddq_t, Tau, t_sample]=timeOptimSpeedPlan(q_s, dq_s, ddq_s, h, M_fn, C_fn, G_fn, constraints, options);
-
-%Use LP
-% [dq_t, ddq_t, Tau, t_sample]=timeOptimSpeedPlan_LP(q_s, dq_s, ddq_s, h, M_fn, C_fn, G_fn, constraints);
-
-%Use fast LP
-[dq_t, ddq_t, Tau, t_sample]=timeOptimSpeedPlan_fastLP(q_s, dq_s, ddq_s, h, M_fn, C_fn, G_fn, constraints);
+%Use TOPPRA
+[dq_t, ddq_t, Tau, t_sample]=timeOptimSpeedPlan_toppra(q_s, dq_s, ddq_s, h, M_fn, C_fn, G_fn, constraints);
 
 fprintf("Optimal Time: %0.3f\n", t_sample(end));
 % plot results
